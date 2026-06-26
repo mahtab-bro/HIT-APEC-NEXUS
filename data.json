@@ -1,0 +1,20 @@
+{
+  "config": {
+    "XP_PER_LEVEL": 500,
+    "MAX_PROOFS_PER_QUEST_PER_DAY": 1,
+    "QUEST_COOLDOWN_MS": 72000000
+  },
+  "quests": [
+    { "id": "study_session", "cat": "scholar", "icon": "📚", "title": "Deep Work Session", "xp": 150, "gold": 50 },
+    { "id": "grade_check", "cat": "scholar", "icon": "📋", "title": "Academic Check-in", "xp": 100, "gold": 35 },
+    { "id": "gym_session", "cat": "fitness", "icon": "💪", "title": "Gym / Workout", "xp": 120, "gold": 40 },
+    { "id": "healthy_meal", "cat": "fitness", "icon": "🥗", "title": "Healthy Meal", "xp": 60, "gold": 20 },
+    { "id": "volunteer", "cat": "community", "icon": "🤝", "title": "Volunteer Work", "xp": 200, "gold": 70 },
+    { "id": "peer_help", "cat": "community", "icon": "🌱", "title": "Help a Peer", "xp": 80, "gold": 25 },
+    { "id": "meditation", "cat": "mind", "icon": "🧘", "title": "Meditation", "xp": 80, "gold": 25 },
+    { "id": "journaling", "cat": "mind", "icon": "📓", "title": "Journal Entry", "xp": 70, "gold": 20 },
+    { "id": "coding", "cat": "skill", "icon": "💻", "title": "Coding Practice", "xp": 160, "gold": 55 },
+    { "id": "reading", "cat": "skill", "icon": "📖", "title": "Reading Session", "xp": 90, "gold": 30 },
+    { "id": "certificate", "cat": "skill", "icon": "🏅", "title": "Course Certification", "xp": 250, "gold": 90 }
+  ]
+}

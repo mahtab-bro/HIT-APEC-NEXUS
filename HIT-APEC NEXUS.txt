@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NEXUS — Proof of Good Work</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<style>
+/* ── TOKENS ─────────────────────────────────────────────────── */
+:root{
+  --bg:#08090C;
+  --surface:#0F1117;
+  --surface2:#161B27;
+  --border:#1E2535;
+  --border-bright:#2D3A52;
+  --text:#E8EDF5;
+  --muted:#5A6A85;
+  --faint:#1C2333;
+
+  /* Accent — electric lime: the one bold risk */
+  --lime:#B8F53A;
+  --lime-dim:rgba(184,245,58,0.12);
+  --lime-glow:rgba(184,245,58,0.25);
+
+  /* Track colors */
+  --scholar:#60A5FA;
+  --fitness:#F97316;
+  --community:#34D399;
+  --mind:#A78BFA;
+  --skill:#F59E0B;
+
+  --radius:12px;
+  --radius-lg:18px;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;overflow-x:hidden;}
+.mono{font-family:'Space Mono',monospace;}
+
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border-bright);border-radius:2px;}
+
+/* ── LAYOUT ─────────────────────────────────────────────────── */
+#app{display:none;height:100vh;overflow:hidden;}
+#topbar{position:fixed;top:0;left:0;right:0;height:56px;background:rgba(8,9,12,0.96);border-bottom:1px solid var(--border);z-index:100;display:flex;align-items:center;padding:0 20px;gap:16px;backdrop-filter:blur(12px);}
+#sidebar{position:fixed;top:56px;left:0;bottom:0;width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 10px;z-index:90;overflow-y:auto;}
+#main{margin-left:220px;margin-top:56px;padding:24px;height:calc(100vh - 56px);overflow-y:auto;}
+
+/* ── NAV ─────────────────────────────────────────────────────── */
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;cursor:pointer;transition:all .15s;color:var(--muted);font-weight:500;font-size:13px;margin-bottom:1px;}
+.nav-item:hover{background:var(--faint);color:var(--text);}
+.nav-item.active{background:var(--lime-dim);color:var(--lime);border-left:2px solid var(--lime);}
+.nav-item i{width:16px;text-align:center;}
+
+/* ── CARDS ───────────────────────────────────────────────────── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);}
+.card-inner{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);}
+
+/* ── BUTTONS ─────────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:8px;border:none;border-radius:9px;padding:9px 18px;font-weight:600;font-size:13px;cursor:pointer;transition:all .15s;font-family:'Space Grotesk',sans-serif;}
+.btn-lime{background:var(--lime);color:#08090C;}
+.btn-lime:hover{background:#cdfb4a;box-shadow:0 0 20px var(--lime-glow);}
+.btn-ghost{background:var(--faint);color:var(--muted);border:1px solid var(--border);}
+.btn-ghost:hover{border-color:var(--border-bright);color:var(--text);}
+.btn-ghost.active{background:var(--lime-dim);color:var(--lime);border-color:var(--lime);}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+
+/* ── INPUTS ──────────────────────────────────────────────────── */
+.field{background:var(--faint);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:14px;width:100%;transition:border-color .15s;}
+.field:focus{outline:none;border-color:var(--lime);background:rgba(184,245,58,0.04);}
+.field.err{border-color:#EF4444;}
+
+/* ── PROGRESS ────────────────────────────────────────────────── */
+.track{background:var(--faint);border-radius:999px;overflow:hidden;height:6px;}
+.fill{height:100%;border-radius:999px;transition:width .8s cubic-bezier(.4,0,.2,1);}
+
+/* ── TOAST ───────────────────────────────────────────────────── */
+#toast-zone{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:flex-end;}
+.toast{min-width:280px;max-width:340px;background:var(--surface2);border:1px solid var(--border-bright);border-radius:12px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;animation:slideIn .25s ease;font-size:13px;box-shadow:0 8px 32px rgba(0,0,0,0.6);}
+.toast.out{animation:slideOut .25s ease forwards;}
+
+/* ── MODAL ───────────────────────────────────────────────────── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+.modal-box{background:var(--surface);border:1px solid var(--border-bright);border-radius:20px;padding:28px;max-width:500px;width:90%;animation:popIn .3s cubic-bezier(.175,.885,.32,1.275);max-height:88vh;overflow-y:auto;}
+
+/* ── AUTH ────────────────────────────────────────────────────── */
+#auth-screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:1000;background:var(--bg);}
+.auth-wrap{width:100%;max-width:460px;padding:36px;animation:fadeIn .4s ease;}
+
+/* ── XP BADGE ────────────────────────────────────────────────── */
+.xp-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:700;}
+
+/* ── PROOF UPLOAD ────────────────────────────────────────────── */
+.upload-zone{border:2px dashed var(--border-bright);border-radius:var(--radius);padding:28px;text-align:center;cursor:pointer;transition:all .2s;position:relative;}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--lime);background:var(--lime-dim);}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+
+/* ── PROOF THUMBNAIL ─────────────────────────────────────────── */
+.proof-thumb{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;border:1px solid var(--border);}
+
+/* ── LEVEL RING ──────────────────────────────────────────────── */
+.avatar-ring{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;position:relative;}
+.avatar-ring::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--lime);opacity:0;transition:opacity .3s;}
+.avatar-ring.glow::after{opacity:1;animation:ringPulse 2s infinite;}
+
+/* ── RANK BADGES ─────────────────────────────────────────────── */
+.rank-1{color:#FFD700;}
+.rank-2{color:#C0C0C0;}
+.rank-3{color:#CD7F32;}
+
+/* ── ANIMATIONS ──────────────────────────────────────────────── */
+@keyframes slideIn{from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes slideOut{from{transform:translateX(0);opacity:1}to{transform:translateX(110%);opacity:0}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes popIn{from{transform:scale(0.88);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes ringPulse{0%{box-shadow:0 0 0 0 var(--lime-glow)}70%{box-shadow:0 0 0 10px transparent}100%{box-shadow:0 0 0 0 transparent}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shimmer{0%{opacity:.6}50%{opacity:1}100%{opacity:.6}}
+@keyframes countUp{0%{transform:scale(1.3);color:var(--lime)}100%{transform:scale(1);color:inherit}}
+@keyframes xpFloat{0%{transform:translateY(0);opacity:1}100%{transform:translateY(-50px);opacity:0}}
+
+.spinner{width:18px;height:18px;border:2px solid var(--border-bright);border-top-color:var(--lime);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;flex-shrink:0;}
+.flash-overlay{position:fixed;inset:0;pointer-events:none;z-index:998;transition:opacity .3s;}
+
+/* ── PROOF GALLERY GRID ──────────────────────────────────────── */
+.proof-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;}
+.proof-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:transform .15s;}
+.proof-card:hover{transform:translateY(-2px);}
+
+/* ── EMPTY STATE ─────────────────────────────────────────────── */
+.empty{text-align:center;padding:40px 20px;color:var(--muted);}
+.empty .icon{font-size:36px;margin-bottom:12px;opacity:.4;}
+
+/* ── STAT CHIP ───────────────────────────────────────────────── */
+.stat-chip{background:var(--faint);border:1px solid var(--border);border-radius:10px;padding:14px 18px;text-align:center;}
+.stat-chip .val{font-family:'Space Mono',monospace;font-size:26px;font-weight:700;color:var(--lime);}
+.stat-chip .lbl{font-size:11px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.5px;}
+
+/* ── QUEST CARD ──────────────────────────────────────────────── */
+.quest-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;transition:border-color .2s;}
+.quest-card:hover{border-color:var(--border-bright);}
+.quest-card.submitted{border-color:rgba(184,245,58,0.3);background:rgba(184,245,58,0.03);}
+
+/* ── LEADERBOARD ROW ─────────────────────────────────────────── */
+.lb-row{display:grid;grid-template-columns:36px 1fr 80px 70px;gap:8px;align-items:center;padding:10px 14px;border-radius:9px;transition:background .15s;}
+.lb-row:hover{background:var(--faint);}
+.lb-row.me{background:var(--lime-dim);border-left:2px solid var(--lime);}
+
+/* ── MOBILE ──────────────────────────────────────────────────── */
+@media(max-width:768px){
+  #sidebar{display:none;}
+  #main{margin-left:0;padding:16px;}
+}
+
+/* ── PAGE BACKGROUNDS (HITSZ campus photos) ──────────────────── */
+#main{
+  background-attachment: fixed;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transition: background-image 0.5s ease;
+}
+#main::before{
+  content:'';
+  position:fixed;
+  inset:0;
+  background:rgba(8,9,12,0.82);
+  pointer-events:none;
+  z-index:0;
+}
+#main > .page{position:relative;z-index:1;}
+
+/* ── SCROLLABLE TABS ─────────────────────────────────────────── */
+.tab-bar{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:20px;}
+.tab-bar::-webkit-scrollbar{height:0;}
+.tab-pill{flex-shrink:0;padding:7px 14px;border-radius:99px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--faint);color:var(--muted);transition:all .15s;}
+.tab-pill.active{background:var(--lime-dim);color:var(--lime);border-color:var(--lime);}
+</style>
+</head>
+<body>
+
+<!-- ─── AUTH ──────────────────────────────────────────────────── -->
+<div id="auth-screen">
+  <div class="auth-wrap">
+    <!-- Logo -->
+    <div style="margin-bottom:28px;">
+
+     
+
+<div style="font-size:11px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;text-align:center;"></div>
+<div style="font-size:34px;font-weight:700;letter-spacing:-1.5px;display:flex;align-items:center;justify-content:center;gap:10px;">
+  HIT <span style="color:var(--lime);">⬡</span> APEC-NEXUS
+</div>
+<div style="font-size:13px;color:var(--muted);margin-top:6px;text-align:center;">
+  <div>Powered by Harbin Institute of Technology, Shenzhen</div>
+  <div style="font-size:14px;color:#ff9800;margin-top:6px;">哈尔滨工业大学（深圳）</div>
+</div>
+    </div>
+
+    <!-- Tab toggle -->
+    <div style="display:flex;gap:0;background:var(--faint);border-radius:10px;padding:3px;margin-bottom:22px;border:1px solid var(--border);">
+      <button onclick="setAuthTab('login')" id="tab-login" class="btn" style="flex:1;justify-content:center;border-radius:7px;font-size:13px;background:var(--surface);color:var(--text);border:1px solid var(--border);">Sign In</button>
+      <button onclick="setAuthTab('signup')" id="tab-signup" class="btn" style="flex:1;justify-content:center;border-radius:7px;font-size:13px;background:transparent;color:var(--muted);border:none;box-shadow:none;">Create Account</button>
+    </div>
+
+    <div id="signup-name-wrap" style="display:none;margin-bottom:14px;">
+      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Full Name</label>
+      <input class="field" id="inp-name" placeholder="Your name" autocomplete="name"/>
+    </div>
+    <div style="margin-bottom:14px;">
+      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Email</label>
+      <input class="field" id="inp-email" type="email" placeholder="enter any valid email id" autocomplete="email"/>
+      <div id="email-err" style="color:#EF4444;font-size:11px;margin-top:4px;display:none;"></div>
+    </div>
+    <div style="margin-bottom:22px;position:relative;">
+      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Password</label>
+      <input class="field" id="inp-pass" type="password" placeholder="Min. 6 characters" autocomplete="current-password" style="padding-right:42px;"/>
+      <button onclick="togglePass()" id="eye-btn" style="position:absolute;right:12px;top:32px;background:none;border:none;color:var(--muted);cursor:pointer;" aria-label="Toggle password"><i class="fa fa-eye" id="eye-icon"></i></button>
+    </div>
+    <button class="btn btn-lime" style="width:100%;justify-content:center;padding:12px;font-size:14px;" onclick="handleAuth()" id="auth-btn">
+      <span id="auth-btn-text">Sign In</span>
+    </button>
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--muted);">
+                       N.B:  Passwords are hashed client-side 
+    </div>
+  </div>
+</div>
+
+<!-- ─── APP ───────────────────────────────────────────────────── -->
+<div id="app">
+
+  <!-- TOPBAR -->
+  <div id="topbar">
+    <div style="font-size:18px;font-weight:700;letter-spacing:-.5px;margin-right:auto;">NEXUS <span style="color:var(--lime);">⬡</span></div>
+    <!-- XP chip -->
+    <div style="display:flex;align-items:center;gap:6px;background:var(--faint);border:1px solid var(--border);border-radius:20px;padding:5px 12px;">
+      <span style="color:var(--lime);font-size:11px;font-weight:700;">XP</span>
+      <span class="mono" style="color:var(--lime);font-size:13px;font-weight:700;" id="top-xp">0</span>
+    </div>
+    <!-- Streak -->
+    <div style="display:flex;align-items:center;gap:5px;background:var(--faint);border:1px solid var(--border);border-radius:20px;padding:5px 12px;">
+      <span id="streak-icon">🩶</span>
+      <span class="mono" style="font-size:13px;font-weight:700;color:#F97316;" id="top-streak">0</span>
+    </div>
+    <!-- Avatar -->
+    <div id="top-avatar" onclick="navigate('profile')" class="avatar-ring" style="width:34px;height:34px;background:var(--surface2);border:1px solid var(--border-bright);font-size:13px;cursor:pointer;">?</div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <!-- User mini -->
+    <div style="padding:12px;background:var(--faint);border-radius:12px;border:1px solid var(--border);margin-bottom:18px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div id="sb-avatar" class="avatar-ring" style="width:38px;height:38px;background:var(--surface2);border:1px solid var(--border-bright);font-size:13px;flex-shrink:0;">?</div>
+        <div style="min-width:0;">
+          <div id="sb-name" style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
+          <div id="sb-rank" style="font-size:11px;color:var(--lime);font-weight:600;">Newcomer</div>
+        </div>
+        <div style="margin-left:auto;text-align:right;flex-shrink:0;">
+          <div class="mono" style="font-size:16px;font-weight:700;color:var(--lime);" id="sb-level">0</div>
+          <div style="font-size:9px;color:var(--muted);">LVL</div>
+        </div>
+      </div>
+    </div>
+    <!-- Nav -->
+    <div class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard"><i class="fa fa-th-large"></i>Dashboard</div>
+    <div class="nav-item" onclick="navigate('quests')" id="nav-quests"><i class="fa fa-scroll"></i>Quests</div>
+    <div class="nav-item" onclick="navigate('leaderboard')" id="nav-leaderboard"><i class="fa fa-trophy"></i>Leaderboard</div>
+    <div class="nav-item" onclick="navigate('profile')" id="nav-profile"><i class="fa fa-user"></i>My Profile</div>
+    <div style="flex:1;"></div>
+    <div class="nav-item" onclick="logout()" style="color:#EF4444;margin-bottom:6px;"><i class="fa fa-sign-out-alt"></i>Log Out</div>
+    <div style="font-size:10px;color:var(--muted);text-align:center;padding:8px;line-height:1.4;">
+        Crafted with care by <strong>Dusk Lab</strong><br>
+        dusklab.hq@gmail.com
+    </div>
+  </div>
+  <!-- MAIN -->
+  <div id="main">
+    <div id="page-dashboard" class="page"></div>
+    <div id="page-quests" class="page" style="display:none;"></div>
+    <div id="page-leaderboard" class="page" style="display:none;"></div>
+    <div id="page-profile" class="page" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- FLASH -->
+<div class="flash-overlay" id="flash-overlay" style="opacity:0;pointer-events:none;"></div>
+
+<!-- TOASTS -->
+<div id="toast-zone"></div>
+
+<!-- MODAL -->
+<div id="modal-bg" class="modal-bg" style="display:none;" onclick="closeModal(event)">
+  <div id="modal-box" class="modal-box"></div>
+</div>
+
+<!-- ─── SCRIPT ─────────────────────────────────────────────────── -->
+<script>
+// ═══════════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════════
+const CFG = {
+  IMGBB_KEY: '',           // paste your ImgBB API key here
+  XP_PER_LEVEL: 500,
+  MAX_PROOFS_PER_QUEST_PER_DAY: 1,
+  QUEST_COOLDOWN_MS: 20 * 3600 * 1000  // 20 hours
+};
+
+// ═══════════════════════════════════════════════════════════════
+// QUEST DEFINITIONS
+// ═══════════════════════════════════════════════════════════════
+const QUEST_DEFS = [
+  // ── Academic
+  {
+    id:'study_session', cat:'scholar', icon:'📚', color:'var(--scholar)',
+    title:'Deep Work Session',
+    desc:'2+ hours of focused study. Photo your notes, open textbook, or library desk.',
+    xp:150, gold:50,
+    proof_hint:'Show your notes, textbook, or study environment.'
+  },
+  {
+    id:'grade_check', cat:'scholar', icon:'📋', color:'var(--scholar)',
+    title:'Academic Check-in',
+    desc:'Submit a screenshot of your student portal, grade, or assignment submission.',
+    xp:100, gold:35,
+    proof_hint:'Screenshot of portal, grade, or submitted assignment.'
+  },
+  // ── Health & Fitness
+  {
+    id:'gym_session', cat:'fitness', icon:'💪', color:'var(--fitness)',
+    title:'Gym / Workout',
+    desc:'Complete a workout session. Photo at the gym, park run, or your workout log.',
+    xp:120, gold:40,
+    proof_hint:'Gym selfie, outdoor workout spot, or fitness app screenshot.'
+  },
+  {
+    id:'healthy_meal', cat:'fitness', icon:'🥗', color:'var(--fitness)',
+    title:'Healthy Meal',
+    desc:'Eat a genuinely nutritious meal. Photo your food.',
+    xp:60, gold:20,
+    proof_hint:'Clear photo of your meal. No junk food counts.'
+  },
+  // ── Community & Volunteering
+  {
+    id:'volunteer', cat:'community', icon:'🤝', color:'var(--community)',
+    title:'Volunteer / Community Work',
+    desc:'Participate in a club, event, or volunteer activity. Photo of you at the event.',
+    xp:200, gold:70,
+    proof_hint:'Photo at the event, or screenshot of event confirmation.'
+  },
+  {
+    id:'peer_help', cat:'community', icon:'🌱', color:'var(--community)',
+    title:'Help a Peer',
+    desc:'Tutor or help a classmate. Screenshot of the study session or a thank-you message.',
+    xp:80, gold:25,
+    proof_hint:'Chat screenshot showing you helped someone, or photo together studying.'
+  },
+  // ── Mental Health & Mindfulness
+  {
+    id:'meditation', cat:'mind', icon:'🧘', color:'var(--mind)',
+    title:'Meditation / Breathing',
+    desc:'Complete 10+ minutes of meditation. Screenshot your meditation app timer.',
+    xp:80, gold:25,
+    proof_hint:'Screenshot of Headspace, Calm, Insight Timer, or any meditation app.'
+  },
+  {
+    id:'journaling', cat:'mind', icon:'📓', color:'var(--mind)',
+    title:'Journal Entry',
+    desc:'Write a reflection or gratitude journal. Photo your journal page (can blur personal details).',
+    xp:70, gold:20,
+    proof_hint:'Photo of a written journal page or digital journaling app screenshot.'
+  },
+  // ── Skill Building
+  {
+    id:'coding', cat:'skill', icon:'💻', color:'var(--skill)',
+    title:'Coding Practice',
+    desc:'Complete a coding challenge or work on a personal project. Screenshot your code or commit.',
+    xp:160, gold:55,
+    proof_hint:'LeetCode/HackerRank submission, GitHub commit, or code editor screenshot.'
+  },
+  {
+    id:'reading', cat:'skill', icon:'📖', color:'var(--skill)',
+    title:'Reading Session',
+    desc:'Read 20+ pages of a non-fiction book or technical article. Photo the page.',
+    xp:90, gold:30,
+    proof_hint:'Photo of the book page or article, ideally showing page number.'
+  },
+  {
+    id:'certificate', cat:'skill', icon:'🏅', color:'var(--skill)',
+    title:'Course / Certification',
+    desc:'Complete an online course module or earn a certificate. Screenshot your progress.',
+    xp:250, gold:90,
+    proof_hint:'Coursera, Udemy, LinkedIn Learning, or any course completion screenshot.'
+  }
+];
+
+const CAT_META = {
+  scholar: {label:'Academic',    icon:'📚', color:'var(--scholar)'},
+  fitness: {label:'Fitness',     icon:'💪', color:'var(--fitness)'},
+  community:{label:'Community',  icon:'🤝', color:'var(--community)'},
+  mind:    {label:'Mindfulness', icon:'🧘', color:'var(--mind)'},
+  skill:   {label:'Skill',       icon:'💻', color:'var(--skill)'}
+};
+
+// ═══════════════════════════════════════════════════════════════
+// CRYPTO UTILS
+// ═══════════════════════════════════════════════════════════════
+async function sha256(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STATE ENGINE
+// ═══════════════════════════════════════════════════════════════
+const S = (()=>{
+  let STORE_KEY = 'nexus3_state'; // default; overridden per-user on login/signup
+  let _s = null;
+  let _listeners = [];
+
+  function fresh(){
+    return {
+      user: { name:'', email:'', passHash:'', joinedAt: Date.now() },
+      xp: { scholar:0, fitness:0, community:0, mind:0, skill:0 },
+      gold: 0,
+      level: 0,
+      streak: { count:0, lastProofDate:'' },
+      proofs: [],         // [{id, questId, cat, xp, gold, imgUrl, ts, note}]
+      cooldowns: {},      // {questId: timestamp_until}
+      badges: []
+    };
+  }
+
+  function load(){
+    try{ const d=localStorage.getItem(STORE_KEY); if(d) return JSON.parse(d); }catch(e){}
+    return fresh();
+  }
+  function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(_s)); }
+
+  function notify(){ _listeners.forEach(fn=>fn(_s)); }
+
+  // Track the current session's store key so logout knows what key is active
+  let _activeKey = null;
+  function getActiveKey(){ return _activeKey; }
+
+  return {
+    init(storeKey){
+      if(storeKey) STORE_KEY = storeKey;
+      _activeKey = STORE_KEY;
+      _s = load(); return _s;
+    },
+    get(){ return _s; },
+    on(fn){ _listeners.push(fn); },
+    update(fn){ fn(_s); save(); notify(); },
+    reset(){ _s = fresh(); save(); notify(); },
+    getActiveKey
+  };
+})();
+
+// ═══════════════════════════════════════════════════════════════
+// ACCOUNT REGISTRY — persists all signed-up accounts on this device
+// Key: nexus3_accounts  →  { [email]: { passHash, stateKey } }
+// Each user's full state lives under their own stateKey.
+// ═══════════════════════════════════════════════════════════════
+const ACCOUNTS = (()=>{
+  const KEY = 'nexus3_accounts';
+  function load(){ try{ const d=localStorage.getItem(KEY); if(d) return JSON.parse(d); }catch(e){} return {}; }
+  function save(map){ localStorage.setItem(KEY, JSON.stringify(map)); }
+  return {
+    exists(email){ return !!load()[email.toLowerCase()]; },
+    register(email, passHash){
+      const map=load();
+      const key='nexus3_state_'+email.toLowerCase().replace(/[^a-z0-9]/g,'_');
+      map[email.toLowerCase()]={passHash, stateKey:key};
+      save(map);
+      return key;
+    },
+    verify(email, passHash){
+      const map=load();
+      const rec=map[email.toLowerCase()];
+      if(!rec) return null;          // not found
+      if(rec.passHash!==passHash) return false; // wrong password
+      return rec.stateKey;           // success → return stateKey
+    }
+  };
+})();
+
+// ═══════════════════════════════════════════════════════════════
+// LEADERBOARD (shared across sessions in same browser via a
+// separate storage key — honest about being single-device for now)
+// ═══════════════════════════════════════════════════════════════
+const LB = (()=>{
+  const KEY = 'nexus3_lb';
+  function load(){ try{ const d=localStorage.getItem(KEY); if(d) return JSON.parse(d); }catch(e){} return []; }
+  function save(entries){ localStorage.setItem(KEY, JSON.stringify(entries)); }
+
+  return {
+    upsert(userId, entry){
+      const all = load();
+      const idx = all.findIndex(e=>e.id===userId);
+      if(idx>=0) all[idx]={...all[idx],...entry};
+      else all.push({id:userId,...entry});
+      save(all);
+    },
+    get(){ return load().sort((a,b)=>b.xp-a.xp); }
+  };
+})();
+
+// ═══════════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════════
+const Toast = (()=>{
+  const cols = {success:'#B8F53A',error:'#EF4444',warn:'#F59E0B',info:'#60A5FA'};
+  const ics  = {success:'fa-check-circle',error:'fa-times-circle',warn:'fa-exclamation-triangle',info:'fa-info-circle'};
+  function show({title,body='',type='info',dur=4000}){
+    const z = document.getElementById('toast-zone');
+    const t = document.createElement('div');
+    t.className='toast';
+    t.style.borderLeft=`3px solid ${cols[type]||cols.info}`;
+    t.innerHTML=`<i class="fa ${ics[type]||ics.info}" style="color:${cols[type]};font-size:16px;margin-top:1px;flex-shrink:0;"></i><div style="flex:1;"><div style="font-weight:700;margin-bottom:2px;">${title}</div>${body?`<div style="color:var(--muted);font-size:12px;">${body}</div>`:''}</div><button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:0 2px;font-size:15px;">×</button>`;
+    z.appendChild(t);
+    setTimeout(()=>{ t.classList.add('out'); setTimeout(()=>t.remove(),250); }, dur);
+  }
+  return {show};
+})();
+
+// ═══════════════════════════════════════════════════════════════
+// MODAL
+// ═══════════════════════════════════════════════════════════════
+function showModal(html){ document.getElementById('modal-bg').style.display='flex'; document.getElementById('modal-box').innerHTML=html; }
+function closeModal(e){ if(!e||e.target===document.getElementById('modal-bg')) document.getElementById('modal-bg').style.display='none'; }
+
+// ═══════════════════════════════════════════════════════════════
+// MISC UTILS
+// ═══════════════════════════════════════════════════════════════
+function flashScreen(color){
+  const o=document.getElementById('flash-overlay');
+  o.style.background=color; o.style.opacity='1';
+  setTimeout(()=>o.style.opacity='0',300);
+}
+
+function totalXP(s){ return Object.values(s.xp).reduce((a,b)=>a+b,0); }
+
+function getLevel(xp){ return Math.floor(xp / CFG.XP_PER_LEVEL); }
+
+function getRankLabel(level){
+  if(level===0) return 'Newcomer';
+  if(level<=2)  return 'Initiate';
+  if(level<=5)  return 'Operative';
+  if(level<=9)  return 'Specialist';
+  if(level<=14) return 'Commander';
+  return 'Legend';
+}
+
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+
+function timeAgo(ts){
+  const d=Date.now()-ts;
+  if(d<60000) return 'just now';
+  if(d<3600000) return Math.floor(d/60000)+'m ago';
+  if(d<86400000) return Math.floor(d/3600000)+'h ago';
+  return Math.floor(d/86400000)+'d ago';
+}
+
+function isOnCooldown(questId){
+  const cd = S.get().cooldowns[questId];
+  return cd && cd > Date.now();
+}
+
+function cdRemaining(questId){
+  const rem = (S.get().cooldowns[questId]||0) - Date.now();
+  if(rem<=0) return '';
+  const h=Math.floor(rem/3600000), m=Math.floor((rem%3600000)/60000);
+  return `${h}h ${m}m`;
+}
+
+function floatXP(amount){
+  const el = document.createElement('div');
+  el.style.cssText=`position:fixed;bottom:80px;right:30px;font-family:'Space Mono',monospace;font-size:22px;font-weight:700;color:var(--lime);pointer-events:none;z-index:9999;animation:xpFloat 1.2s ease-out forwards;`;
+  el.textContent=`+${amount} XP`;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),1200);
+}
+
+function animCount(el, from, to, ms=700){
+  const start=performance.now();
+  function step(now){
+    const p=Math.min((now-start)/ms,1);
+    const ease=1-Math.pow(1-p,3);
+    el.textContent=Math.round(from+(to-from)*ease).toLocaleString();
+    if(p<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// IMGBB UPLOAD
+// ═══════════════════════════════════════════════════════════════
+async function uploadToImgBB(file){
+  if(!CFG.IMGBB_KEY){
+    // No key — return a placeholder URL for demo purposes
+    return URL.createObjectURL(file); // local blob URL (works for demo session)
+  }
+  const form = new FormData();
+  form.append('image', file);
+  const res = await fetch(`https://api.imgbb.com/1/upload?key=${CFG.IMGBB_KEY}`, {
+    method:'POST', body:form
+  });
+  const data = await res.json();
+  if(!data.success) throw new Error(data.error?.message||'Upload failed');
+  return data.data.url;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════════════
+let authTab = 'login';
+
+function setAuthTab(t){
+  authTab=t;
+  const tl=document.getElementById('tab-login'), ts=document.getElementById('tab-signup');
+  if(t==='login'){
+    tl.style.cssText='flex:1;justify-content:center;border-radius:7px;font-size:13px;background:var(--surface);color:var(--text);border:1px solid var(--border);';
+    ts.style.cssText='flex:1;justify-content:center;border-radius:7px;font-size:13px;background:transparent;color:var(--muted);border:none;box-shadow:none;';
+    document.getElementById('signup-name-wrap').style.display='none';
+    document.getElementById('auth-btn-text').textContent='Sign In';
+  } else {
+    ts.style.cssText='flex:1;justify-content:center;border-radius:7px;font-size:13px;background:var(--surface);color:var(--text);border:1px solid var(--border);';
+    tl.style.cssText='flex:1;justify-content:center;border-radius:7px;font-size:13px;background:transparent;color:var(--muted);border:none;box-shadow:none;';
+    document.getElementById('signup-name-wrap').style.display='block';
+    document.getElementById('auth-btn-text').textContent='Create Account';
+  }
+  document.getElementById('inp-email').value='';
+  document.getElementById('inp-pass').value='';
+}
+
+function togglePass(){
+  const inp=document.getElementById('inp-pass');
+  const ic=document.getElementById('eye-icon');
+  inp.type=inp.type==='password'?'text':'password';
+  ic.className=inp.type==='password'?'fa fa-eye':'fa fa-eye-slash';
+}
+
+async function handleAuth(){
+  const email=document.getElementById('inp-email').value.trim();
+  const pass=document.getElementById('inp-pass').value;
+  const nameVal=document.getElementById('inp-name').value.trim();
+  const errEl=document.getElementById('email-err');
+
+  if(!email||!pass){ Toast.show({title:'Fill in all fields.',type:'error'}); return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ errEl.style.display='block'; errEl.textContent='Enter a valid email.'; return; }
+  if(pass.length<6){ Toast.show({title:'Password must be at least 6 characters.',type:'error'}); return; }
+  errEl.style.display='none';
+
+  const btn=document.getElementById('auth-btn');
+  btn.innerHTML='<div class="spinner"></div>';
+  btn.disabled=true;
+
+  const passHash = await sha256(pass+email); // salted with email
+
+  if(authTab==='signup'){
+    // Block duplicate signups
+    if(ACCOUNTS.exists(email)){
+      btn.innerHTML='<span id="auth-btn-text">Create Account</span>';
+      btn.disabled=false;
+      Toast.show({title:'This email is already registered.',body:'Please sign in instead.',type:'error'});
+      return;
+    }
+    const stateKey = ACCOUNTS.register(email, passHash);
+    S.init(stateKey);
+    const name = nameVal || email.split('@')[0].replace(/[._]/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+    S.update(st=>{
+      st.user.name=name;
+      st.user.email=email;
+      st.user.passHash=passHash;
+      st.user.joinedAt=Date.now();
+    });
+    bootApp();
+  } else {
+    // Login: look up account in registry
+    const result = ACCOUNTS.verify(email, passHash);
+    if(result===null){
+      btn.innerHTML='<span id="auth-btn-text">Sign In</span>';
+      btn.disabled=false;
+      Toast.show({title:'No account found for this email.',body:'Please create an account first.',type:'error'});
+      return;
+    }
+    if(result===false){
+      btn.innerHTML='<span id="auth-btn-text">Sign In</span>';
+      btn.disabled=false;
+      Toast.show({title:'Incorrect password.',type:'error'});
+      return;
+    }
+    // result is the stateKey — load that user's state
+    S.init(result);
+    bootApp();
+  }
+}
+
+function bootApp(){
+  const s=S.get();
+  // Sync leaderboard
+  LB.upsert(s.user.email, {
+    name:s.user.name,
+    xp:totalXP(s),
+    level:getLevel(totalXP(s)),
+    proofCount:s.proofs.length
+  });
+
+  const auth=document.getElementById('auth-screen');
+  auth.style.transition='opacity .4s';
+  auth.style.opacity='0';
+  setTimeout(()=>{
+    auth.style.display='none';
+    document.getElementById('app').style.display='block';
+    initApp();
+  },400);
+}
+
+function logout(){
+  // Clear only the active session marker — user data stays in storage
+  document.getElementById('app').style.display='none';
+  const auth=document.getElementById('auth-screen');
+  auth.style.display='flex';
+  auth.style.opacity='1';
+  // Reset auth form
+  setAuthTab('login');
+  document.getElementById('auth-btn').innerHTML='<span id="auth-btn-text">Sign In</span>';
+  document.getElementById('auth-btn').disabled=false;
+  Toast.show({title:'Logged out.',body:'Sign in to return to your account.',type:'info'});
+}
+
+// ═══════════════════════════════════════════════════════════════
+// APP INIT
+// ═══════════════════════════════════════════════════════════════
+let currentPage='dashboard';
+
+function initApp(){
+  setPageBackground('dashboard');
+  preloadBackgrounds(); // resolve Wikimedia URLs in background
+  renderTopbar();
+  renderSidebar();
+  renderDashboard();
+  S.on(()=>{
+    renderTopbar();
+    renderSidebar();
+    if(currentPage==='dashboard') renderDashboard();
+    if(currentPage==='leaderboard') renderLeaderboard();
+    if(currentPage==='profile') renderProfile();
+  });
+}
+
+// HITSZ / HIT campus backgrounds resolved at runtime via Wikimedia Commons API
+const PAGE_BG_FILES = {
+  dashboard:   'Harbin_Institute_of_Technology_(Shenzhen)_Old_Building_(Bachelor).jpg',
+  quests:      'Harbin_IT_04.jpg',
+  leaderboard: 'Main_Building_HIT.jpg',
+  profile:     'Museum_of_Harbin_Institute_of_Technology.jpg'
+};
+
+const _bgCache = {};
+
+async function resolveWikimediaUrl(filename){
+  const api = `https://commons.wikimedia.org/w/api.php?action=query&titles=File:${encodeURIComponent(filename)}&prop=imageinfo&iiprop=url&iiurlwidth=1280&format=json&origin=*`;
+  const res = await fetch(api);
+  const data = await res.json();
+  const pages = data.query.pages;
+  const page = pages[Object.keys(pages)[0]];
+  return (page.imageinfo[0].thumburl || page.imageinfo[0].url);
+}
+
+function applyBackground(url){
+  document.getElementById('main').style.backgroundImage = url ? `url('${url}')` : 'none';
+}
+
+async function preloadBackgrounds(){
+  for(const [pageName, filename] of Object.entries(PAGE_BG_FILES)){
+    resolveWikimediaUrl(filename).then(url=>{
+      _bgCache[pageName] = url;
+      if(currentPage === pageName) applyBackground(url);
+      const img = new Image(); img.src = url;
+    }).catch(()=>{});
+  }
+}
+
+function setPageBackground(page){
+  if(_bgCache[page]) applyBackground(_bgCache[page]);
+  else applyBackground('');
+}
+
+function navigate(page){
+  currentPage=page;
+  setPageBackground(page);
+  document.querySelectorAll('.page').forEach(p=>p.style.display='none');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+page).style.display='block';
+  const nav=document.getElementById('nav-'+page);
+  if(nav) nav.classList.add('active');
+  if(page==='dashboard') renderDashboard();
+  if(page==='quests') renderQuests();
+  if(page==='leaderboard') renderLeaderboard();
+  if(page==='profile') renderProfile();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TOPBAR + SIDEBAR
+// ═══════════════════════════════════════════════════════════════
+function renderTopbar(){
+  const s=S.get();
+  const xp=totalXP(s);
+  const xpEl=document.getElementById('top-xp');
+  const cur=parseInt(xpEl.textContent.replace(/,/g,''))||0;
+  if(cur!==xp) animCount(xpEl,cur,xp);
+  document.getElementById('top-streak').textContent=s.streak.count;
+  document.getElementById('streak-icon').textContent=s.streak.count>0?'🔥':'🩶';
+  const init=(s.user.name||'?').split(' ').map(x=>x[0]).join('').toUpperCase().slice(0,2);
+  document.getElementById('top-avatar').textContent=init;
+}
+
+function renderSidebar(){
+  const s=S.get();
+  const xp=totalXP(s);
+  const lv=getLevel(xp);
+  const init=(s.user.name||'?').split(' ').map(x=>x[0]).join('').toUpperCase().slice(0,2);
+  document.getElementById('sb-avatar').textContent=init;
+  document.getElementById('sb-name').textContent=s.user.name||'—';
+  document.getElementById('sb-rank').textContent=getRankLabel(lv);
+  document.getElementById('sb-level').textContent=lv;
+  if(s.proofs.length>0) document.getElementById('sb-avatar').classList.add('glow');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+function renderDashboard(){
+  const s=S.get();
+  const xp=totalXP(s);
+  const lv=getLevel(xp);
+  const xpInLevel=xp%(CFG.XP_PER_LEVEL);
+  const xpPct=Math.round((xpInLevel/CFG.XP_PER_LEVEL)*100);
+  const rank=getRankLabel(lv);
+  const recentProofs=s.proofs.slice().sort((a,b)=>b.ts-a.ts).slice(0,6);
+
+  // Per-cat XP
+  const catRows=Object.entries(CAT_META).map(([key,meta])=>{
+    const v=s.xp[key]||0;
+    const pct=Math.min(Math.round((v/500)*100),100);
+    return `<div style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+        <div style="font-size:13px;font-weight:600;">${meta.icon} ${meta.label}</div>
+        <div class="mono" style="font-size:12px;color:${meta.color};">${v} XP</div>
+      </div>
+      <div class="track"><div class="fill" style="width:${pct}%;background:${meta.color};"></div></div>
+    </div>`;
+  }).join('');
+
+  const el=document.getElementById('page-dashboard');
+  el.innerHTML=`
+    <!-- Header -->
+    <div style="margin-bottom:24px;">
+      <div style="font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">Welcome back</div>
+      <div style="font-size:28px;font-weight:700;letter-spacing:-.5px;">${s.user.name||'Nexus User'}</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:4px;">${rank} · Level ${lv} · ${s.proofs.length} verified proof${s.proofs.length!==1?'s':''} submitted</div>
+    </div>
+
+    <!-- Stat chips -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;">
+      <div class="stat-chip"><div class="val">${xp.toLocaleString()}</div><div class="lbl">Total XP</div></div>
+      <div class="stat-chip"><div class="val" style="color:#F97316;">${s.streak.count}</div><div class="lbl">Day Streak</div></div>
+      <div class="stat-chip"><div class="val" style="color:var(--skill);">${s.gold}</div><div class="lbl">Gold</div></div>
+      <div class="stat-chip"><div class="val" style="color:var(--community);">${s.proofs.length}</div><div class="lbl">Proofs</div></div>
+    </div>
+
+    <!-- Level progress -->
+    <div class="card" style="padding:20px;margin-bottom:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="font-weight:700;">Level ${lv} → ${lv+1}</div>
+        <div class="mono" style="font-size:12px;color:var(--muted);">${xpInLevel} / ${CFG.XP_PER_LEVEL} XP</div>
+      </div>
+      <div class="track" style="height:10px;">
+        <div class="fill" style="width:${xpPct}%;background:linear-gradient(90deg,var(--lime),#8BCC1A);"></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;">${CFG.XP_PER_LEVEL-xpInLevel} XP to next level</div>
+    </div>
+
+    <!-- Two-col: cats + recent proofs -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+      <div class="card" style="padding:20px;">
+        <div style="font-weight:700;margin-bottom:16px;font-size:14px;">XP by Category</div>
+        ${catRows}
+      </div>
+      <div class="card" style="padding:20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+          <div style="font-weight:700;font-size:14px;">Recent Proofs</div>
+          ${recentProofs.length>0?`<button class="btn btn-ghost" style="font-size:11px;padding:5px 10px;" onclick="navigate('profile')">View all</button>`:''}
+        </div>
+        ${recentProofs.length===0?`<div class="empty"><div class="icon">📭</div><div>No proofs yet.</div><div style="font-size:12px;margin-top:6px;">Complete a quest to see your gallery.</div></div>`:`
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${recentProofs.map(p=>{
+            const q=QUEST_DEFS.find(q=>q.id===p.questId)||{};
+            return `<div style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--faint);border-radius:8px;">
+              <img src="${p.imgUrl}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;border:1px solid var(--border);flex-shrink:0;" loading="lazy"/>
+              <div style="min-width:0;">
+                <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${q.icon||'⚡'} ${q.title||p.questId}</div>
+                <div style="font-size:11px;color:var(--muted);">${timeAgo(p.ts)} · +${p.xp} XP</div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`}
+      </div>
+    </div>
+
+    <!-- CTA -->
+    ${s.proofs.length===0?`
+    <div style="background:var(--lime-dim);border:1px solid var(--lime);border-radius:var(--radius-lg);padding:22px;display:flex;align-items:center;justify-content:space-between;gap:16px;">
+      <div>
+        <div style="font-weight:700;color:var(--lime);margin-bottom:4px;">You start at zero. That's the point.</div>
+        <div style="font-size:13px;color:var(--muted);">Submit your first proof and earn your first XP. No shortcuts.</div>
+      </div>
+      <button class="btn btn-lime" onclick="navigate('quests')" style="flex-shrink:0;"><i class="fa fa-scroll"></i> Start a Quest</button>
+    </div>`:`
+    <div style="background:var(--faint);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <div style="font-size:13px;color:var(--muted);">Keep going. Every proof builds your rank.</div>
+      <button class="btn btn-lime" onclick="navigate('quests')"><i class="fa fa-plus"></i> New Quest</button>
+    </div>`}
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// QUESTS
+// ═══════════════════════════════════════════════════════════════
+let activeQuestFilter='all';
+
+function renderQuests(){
+  const s=S.get();
+  const el=document.getElementById('page-quests');
+
+  const cats=[{k:'all',l:'All'}, ...Object.entries(CAT_META).map(([k,m])=>({k,l:m.label}))];
+
+  const filtered=activeQuestFilter==='all'?QUEST_DEFS:QUEST_DEFS.filter(q=>q.cat===activeQuestFilter);
+
+  el.innerHTML=`
+    <div style="margin-bottom:20px;">
+      <div style="font-size:22px;font-weight:700;letter-spacing:-.5px;margin-bottom:4px;"><i class="fa fa-scroll" style="color:var(--lime);margin-right:10px;"></i>Quest Codex</div>
+      <div style="font-size:13px;color:var(--muted);">Upload proof. Earn XP. Every point is verified.</div>
+    </div>
+    <div class="tab-bar">
+      ${cats.map(c=>`<div class="tab-pill ${activeQuestFilter===c.k?'active':''}" onclick="setQuestFilter('${c.k}')">${c.l}</div>`).join('')}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;">
+      ${filtered.map(q=>renderQuestCard(q,s)).join('')}
+    </div>
+  `;
+}
+
+function setQuestFilter(cat){
+  activeQuestFilter=cat;
+  renderQuests();
+}
+
+function renderQuestCard(q, s){
+  const cd=isOnCooldown(q.id);
+  const todayProofs=s.proofs.filter(p=>p.questId===q.id && p.ts>Date.now()-86400000);
+  const done=todayProofs.length>=CFG.MAX_PROOFS_PER_QUEST_PER_DAY;
+  const meta=CAT_META[q.cat]||{};
+
+  let footer;
+  if(done||cd){
+    footer=`<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--faint);border-radius:8px;font-size:12px;color:var(--muted);">
+      <i class="fa fa-lock"></i>
+      ${done?'Completed today':'Cooldown: '+cdRemaining(q.id)}
+    </div>`;
+  } else {
+    footer=`<button class="btn btn-lime" style="width:100%;justify-content:center;" onclick="openQuestModal('${q.id}')">
+      <i class="fa fa-camera"></i> Submit Proof
+    </button>`;
+  }
+
+  return `<div class="quest-card ${done?'submitted':''}">
+    <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px;">
+      <div style="font-size:30px;flex-shrink:0;">${q.icon}</div>
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:14px;margin-bottom:4px;">${q.title}</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.5;">${q.desc}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <span style="font-size:11px;background:${q.color}22;color:${q.color};padding:3px 8px;border-radius:99px;font-weight:700;">+${q.xp} XP</span>
+      <span style="font-size:11px;background:rgba(245,158,11,0.15);color:var(--skill);padding:3px 8px;border-radius:99px;font-weight:700;">+${q.gold} Gold</span>
+      <span style="font-size:11px;background:var(--faint);color:var(--muted);padding:3px 8px;border-radius:99px;">${meta.label||q.cat}</span>
+    </div>
+    ${footer}
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// QUEST SUBMISSION MODAL
+// ═══════════════════════════════════════════════════════════════
+let _pendingFile=null;
+let _pendingPreviewUrl=null;
+
+function openQuestModal(questId){
+  _pendingFile=null; _pendingPreviewUrl=null;
+  const q=QUEST_DEFS.find(x=>x.id===questId);
+  if(!q) return;
+
+  showModal(`
+    <div style="margin-bottom:20px;">
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:6px;">Submit Proof</div>
+      <div style="font-size:20px;font-weight:700;margin-bottom:4px;">${q.icon} ${q.title}</div>
+      <div style="font-size:13px;color:var(--muted);">${q.desc}</div>
+    </div>
+
+    <!-- Upload zone -->
+    <div class="upload-zone" id="upload-zone" onclick="document.getElementById('proof-file').click()">
+      <input type="file" id="proof-file" accept="image/*" style="display:none" onchange="previewProof(event,'${questId}')"/>
+      <div id="upload-placeholder">
+        <div style="font-size:28px;margin-bottom:8px;">📷</div>
+        <div style="font-weight:600;margin-bottom:4px;">Tap to upload proof</div>
+        <div style="font-size:12px;color:var(--muted);">${q.proof_hint}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">JPG, PNG, GIF · max 32MB</div>
+      </div>
+      <div id="upload-preview" style="display:none;">
+        <img id="proof-img-preview" style="max-width:100%;border-radius:8px;max-height:200px;object-fit:contain;"/>
+        <div style="font-size:12px;color:var(--lime);margin-top:8px;font-weight:600;" id="preview-label">✓ Ready to submit</div>
+      </div>
+    </div>
+
+    <!-- Optional note -->
+    <div style="margin-top:14px;">
+      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Note (optional)</label>
+      <input class="field" id="proof-note" placeholder="e.g. Studied chapter 4, metabolic pathways…" maxlength="200"/>
+    </div>
+
+    <!-- Reward preview -->
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <div class="card-inner" style="flex:1;padding:12px;text-align:center;">
+        <div class="mono" style="font-size:20px;font-weight:700;color:var(--lime);">+${q.xp}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">XP</div>
+      </div>
+      <div class="card-inner" style="flex:1;padding:12px;text-align:center;">
+        <div class="mono" style="font-size:20px;font-weight:700;color:var(--skill);">+${q.gold}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">Gold</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:18px;">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="closeModal(null)">Cancel</button>
+      <button class="btn btn-lime" style="flex:1;justify-content:center;" id="submit-proof-btn" onclick="submitProof('${questId}')" disabled>
+        <i class="fa fa-upload"></i> Submit
+      </button>
+    </div>
+    <div id="submit-error" style="color:#EF4444;font-size:12px;margin-top:8px;display:none;"></div>
+  `);
+}
+
+function previewProof(event, questId){
+  const file=event.target.files[0];
+  if(!file) return;
+  if(file.size>33554432){ Toast.show({title:'File too large. Max 32MB.',type:'error'}); return; }
+  _pendingFile=file;
+  _pendingPreviewUrl=URL.createObjectURL(file);
+  document.getElementById('upload-placeholder').style.display='none';
+  document.getElementById('upload-preview').style.display='block';
+  document.getElementById('proof-img-preview').src=_pendingPreviewUrl;
+  document.getElementById('preview-label').textContent=`✓ ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)`;
+  document.getElementById('submit-proof-btn').disabled=false;
+}
+
+async function submitProof(questId){
+  if(!_pendingFile){ Toast.show({title:'Upload a proof image first.',type:'warn'}); return; }
+  const q=QUEST_DEFS.find(x=>x.id===questId);
+  if(!q) return;
+
+  const btn=document.getElementById('submit-proof-btn');
+  const errEl=document.getElementById('submit-error');
+  btn.innerHTML='<div class="spinner"></div> Uploading...';
+  btn.disabled=true;
+  errEl.style.display='none';
+
+  try{
+    const imgUrl=await uploadToImgBB(_pendingFile);
+    const note=(document.getElementById('proof-note')||{}).value||'';
+    const ts=Date.now();
+
+    let leveledUp=false, newLevel=0;
+
+    S.update(st=>{
+      // Apply XP
+      st.xp[q.cat]=(st.xp[q.cat]||0)+q.xp;
+      st.gold+=q.gold;
+
+      // Recalculate level
+      const xp=totalXP(st);
+      const newLv=getLevel(xp);
+      if(newLv>st.level){ leveledUp=true; newLevel=newLv; st.level=newLv; }
+
+      // Store proof
+      st.proofs.push({
+        id: `${questId}_${ts}`,
+        questId, cat:q.cat,
+        xp:q.xp, gold:q.gold,
+        imgUrl, note, ts
+      });
+
+      // Cooldown
+      st.cooldowns[questId]=Date.now()+CFG.QUEST_COOLDOWN_MS;
+
+      // Streak
+      const today=todayStr();
+      if(st.streak.lastProofDate!==today){
+        const yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);
+        if(st.streak.lastProofDate===yesterday) st.streak.count++;
+        else st.streak.count=1;
+        st.streak.lastProofDate=today;
+      }
+    });
+
+    // Sync leaderboard
+    const s=S.get();
+    LB.upsert(s.user.email,{
+      name:s.user.name,
+      xp:totalXP(s),
+      level:getLevel(totalXP(s)),
+      proofCount:s.proofs.length
+    });
+
+    document.getElementById('modal-bg').style.display='none';
+    flashScreen('rgba(184,245,58,0.12)');
+    floatXP(q.xp);
+    confetti({particleCount:100,spread:70,origin:{y:0.6},colors:['#B8F53A','#60A5FA','#F97316']});
+    Toast.show({title:`Proof verified! +${q.xp} XP · +${q.gold} Gold`,type:'success'});
+
+    if(leveledUp){
+      setTimeout(()=>showLevelUpModal(newLevel),600);
+    }
+
+  }catch(err){
+    btn.innerHTML='<i class="fa fa-upload"></i> Submit';
+    btn.disabled=false;
+    errEl.style.display='block';
+    errEl.textContent='Upload failed: '+err.message+'. Check your ImgBB key or try again.';
+  }
+}
+
+function showLevelUpModal(level){
+  confetti({particleCount:200,spread:160,colors:['#B8F53A','#FFD700','#60A5FA']});
+  const rank=getRankLabel(level);
+  showModal(`
+    <div style="text-align:center;">
+      <div style="font-size:56px;margin-bottom:12px;">⬆️</div>
+      <div style="font-size:11px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">Level Up</div>
+      <div style="font-size:36px;font-weight:700;color:var(--lime);letter-spacing:-1px;">Level ${level}</div>
+      <div style="font-size:16px;color:var(--muted);margin-top:8px;margin-bottom:20px;">${rank}</div>
+      <div style="background:var(--faint);border:1px solid var(--border);border-radius:var(--radius);padding:14px;font-size:13px;color:var(--muted);margin-bottom:20px;">
+        This rank was earned — not given. Keep proving it.
+      </div>
+      <button class="btn btn-lime" style="width:100%;justify-content:center;" onclick="closeModal(null)">Continue</button>
+    </div>
+  `);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LEADERBOARD
+// ═══════════════════════════════════════════════════════════════
+function renderLeaderboard(){
+  const s=S.get();
+  const all=LB.get();
+  const myIdx=all.findIndex(e=>e.id===s.user.email);
+  const myRank=myIdx+1;
+
+  const el=document.getElementById('page-leaderboard');
+
+  if(all.length===0){
+    el.innerHTML=`<div style="margin-bottom:20px;"><div style="font-size:22px;font-weight:700;letter-spacing:-.5px;margin-bottom:4px;"><i class="fa fa-trophy" style="color:var(--lime);margin-right:10px;"></i>Leaderboard</div></div>
+    <div class="empty card" style="padding:60px 20px;"><div class="icon">🏆</div><div style="font-size:16px;font-weight:600;margin-bottom:8px;">No rankings yet.</div><div style="font-size:13px;">Submit a proof to appear on the board.</div></div>`;
+    return;
+  }
+
+  el.innerHTML=`
+    <div style="margin-bottom:20px;">
+      <div style="font-size:22px;font-weight:700;letter-spacing:-.5px;margin-bottom:4px;"><i class="fa fa-trophy" style="color:var(--lime);margin-right:10px;"></i>Leaderboard</div>
+      <div style="font-size:13px;color:var(--muted);">${all.length} user${all.length!==1?'s':''} with verified proofs${myRank>0?` · You are ranked <span style="color:var(--lime);font-weight:700;">#${myRank}</span>`:''}</div>
+    </div>
+    <div class="card" style="overflow:hidden;padding:0;">
+      <!-- Header -->
+      <div style="padding:10px 14px;background:var(--faint);border-bottom:1px solid var(--border);display:grid;grid-template-columns:36px 1fr 80px 70px;gap:8px;font-size:11px;color:var(--muted);font-weight:700;letter-spacing:1px;text-transform:uppercase;">
+        <span>#</span><span>Student</span><span>XP</span><span>Proofs</span>
+      </div>
+      ${all.map((entry,i)=>{
+        const isMe=entry.id===s.user.email;
+        const rank=i+1;
+        const medal=rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':rank;
+        return `<div class="lb-row ${isMe?'me':''}" style="border-bottom:1px solid var(--border);">
+          <span style="font-weight:700;font-size:${rank<=3?'16':'13'}px;class="${rank<=3?'rank-'+rank:''}">${medal}</span>
+          <span style="display:flex;align-items:center;gap:8px;">
+            <span style="width:26px;height:26px;border-radius:50%;background:var(--surface2);border:1px solid var(--border-bright);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">${(entry.name||'?').split(' ').map(x=>x[0]).join('').toUpperCase().slice(0,2)}</span>
+            <span style="font-weight:${isMe?'700':'500'};font-size:13px;">${entry.name||'—'}${isMe?' <span style="color:var(--lime);font-size:11px;">(you)</span>':''}</span>
+          </span>
+          <span class="mono" style="font-size:13px;font-weight:700;color:var(--lime);">${(entry.xp||0).toLocaleString()}</span>
+          <span class="mono" style="font-size:13px;color:var(--muted);">${entry.proofCount||0}</span>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="margin-top:12px;font-size:11px;color:var(--muted);text-align:center;">Rankings are based on total verified XP from proof submissions only.</div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PROFILE / PROOF GALLERY
+// ═══════════════════════════════════════════════════════════════
+let profileFilter='all';
+
+function renderProfile(){
+  const s=S.get();
+  const xp=totalXP(s);
+  const lv=getLevel(xp);
+  const allProofs=s.proofs.slice().sort((a,b)=>b.ts-a.ts);
+  const filtered=profileFilter==='all'?allProofs:allProofs.filter(p=>p.cat===profileFilter);
+
+  const cats=[{k:'all',l:'All'},...Object.entries(CAT_META).map(([k,m])=>({k,l:m.label}))];
+
+  const proofCards=filtered.map(p=>{
+    const q=QUEST_DEFS.find(q=>q.id===p.questId)||{icon:'⚡',title:p.questId};
+    const meta=CAT_META[p.cat]||{color:'var(--muted)'};
+    return `<div class="proof-card" onclick="openProofDetail('${p.id}')">
+      <img src="${p.imgUrl}" class="proof-thumb" loading="lazy" onerror="this.style.display='none'"/>
+      <div style="padding:10px;">
+        <div style="font-size:12px;font-weight:700;margin-bottom:2px;">${q.icon} ${q.title}</div>
+        ${p.note?`<div style="font-size:11px;color:var(--muted);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.note}</div>`:''}
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;">
+          <span style="font-size:11px;color:${meta.color};font-weight:700;">+${p.xp} XP</span>
+          <span style="font-size:10px;color:var(--muted);">${timeAgo(p.ts)}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const el=document.getElementById('page-profile');
+  el.innerHTML=`
+    <!-- Profile header -->
+    <div class="card" style="padding:24px;margin-bottom:20px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+      <div class="avatar-ring ${s.proofs.length>0?'glow':''}" style="width:64px;height:64px;background:var(--surface2);border:1px solid var(--border-bright);font-size:22px;font-weight:700;flex-shrink:0;">
+        ${(s.user.name||'?').split(' ').map(x=>x[0]).join('').toUpperCase().slice(0,2)}
+      </div>
+      <div style="flex:1;">
+        <div style="font-size:22px;font-weight:700;letter-spacing:-.5px;margin-bottom:2px;">${s.user.name||'—'}</div>
+        <div style="font-size:13px;color:var(--muted);">${s.user.email}</div>
+        <div style="margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;">
+          <span style="font-size:12px;font-weight:700;color:var(--lime);">${getRankLabel(lv)}</span>
+          <span style="font-size:12px;color:var(--muted);">·</span>
+          <span style="font-size:12px;color:var(--muted);">Level ${lv}</span>
+          <span style="font-size:12px;color:var(--muted);">·</span>
+          <span style="font-size:12px;color:var(--muted);">Joined ${new Date(s.user.joinedAt).toLocaleDateString()}</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <div class="stat-chip" style="min-width:70px;"><div class="val">${xp.toLocaleString()}</div><div class="lbl">XP</div></div>
+        <div class="stat-chip" style="min-width:70px;"><div class="val" style="color:#F97316;">${s.streak.count}</div><div class="lbl">Streak</div></div>
+        <div class="stat-chip" style="min-width:70px;"><div class="val" style="color:var(--community);">${allProofs.length}</div><div class="lbl">Proofs</div></div>
+      </div>
+    </div>
+
+    <!-- Proof gallery -->
+    <div style="margin-bottom:14px;">
+      <div style="font-size:16px;font-weight:700;margin-bottom:12px;">Proof Gallery</div>
+      <div class="tab-bar">
+        ${cats.map(c=>`<div class="tab-pill ${profileFilter===c.k?'active':''}" onclick="setProfileFilter('${c.k}')">${c.l}</div>`).join('')}
+      </div>
+    </div>
+
+    ${filtered.length===0?`<div class="empty card" style="padding:50px 20px;"><div class="icon">📭</div><div style="font-size:15px;font-weight:600;margin-bottom:6px;">No proofs in this category.</div><div style="font-size:13px;"><button class="btn btn-lime" style="margin-top:12px;" onclick="navigate('quests')"><i class="fa fa-plus"></i> Submit a proof</button></div></div>`:`
+    <div class="proof-grid">${proofCards}</div>`}
+
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+      <button class="btn btn-ghost" onclick="confirmReset()" style="font-size:12px;color:#EF4444;border-color:rgba(239,68,68,0.3);">
+        <i class="fa fa-trash"></i> Reset account
+      </button>
+    </div>
+  `;
+}
+
+function setProfileFilter(cat){
+  profileFilter=cat;
+  renderProfile();
+}
+
+function openProofDetail(proofId){
+  const s=S.get();
+  const p=s.proofs.find(x=>x.id===proofId);
+  if(!p) return;
+  const q=QUEST_DEFS.find(x=>x.id===p.questId)||{icon:'⚡',title:p.questId};
+  const meta=CAT_META[p.cat]||{label:p.cat,color:'var(--muted)'};
+  showModal(`
+    <div>
+      <img src="${p.imgUrl}" style="width:100%;border-radius:10px;margin-bottom:16px;" loading="lazy"/>
+      <div style="font-size:18px;font-weight:700;margin-bottom:4px;">${q.icon} ${q.title}</div>
+      ${p.note?`<div style="font-size:13px;color:var(--muted);margin-bottom:12px;">"${p.note}"</div>`:''}
+      <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+        <span style="font-size:12px;background:${meta.color}22;color:${meta.color};padding:4px 10px;border-radius:99px;font-weight:700;">${meta.label}</span>
+        <span style="font-size:12px;background:var(--lime-dim);color:var(--lime);padding:4px 10px;border-radius:99px;font-weight:700;">+${p.xp} XP</span>
+        <span style="font-size:12px;background:rgba(245,158,11,0.15);color:var(--skill);padding:4px 10px;border-radius:99px;font-weight:700;">+${p.gold} Gold</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);">Submitted ${new Date(p.ts).toLocaleString()}</div>
+      <button class="btn btn-ghost" style="width:100%;justify-content:center;margin-top:16px;" onclick="closeModal(null)">Close</button>
+    </div>
+  `);
+}
+
+function confirmReset(){
+  showModal(`
+    <div style="text-align:center;">
+      <div style="font-size:32px;margin-bottom:12px;">⚠️</div>
+      <div style="font-size:18px;font-weight:700;margin-bottom:8px;">Reset your account?</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:22px;">This deletes all your proofs, XP, and progress. It cannot be undone.</div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="closeModal(null)">Cancel</button>
+        <button class="btn" style="flex:1;justify-content:center;background:#EF4444;color:#fff;" onclick="doReset()">Yes, reset</button>
+      </div>
+    </div>
+  `);
+}
+
+function doReset(){
+  S.reset();
+  closeModal(null);
+  document.getElementById('app').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+  document.getElementById('auth-screen').style.opacity='1';
+  document.getElementById('auth-btn').innerHTML='<span id="auth-btn-text">Sign In</span>';
+  document.getElementById('auth-btn').disabled=false;
+  document.getElementById('inp-email').value='';
+  document.getElementById('inp-pass').value='';
+  Toast.show({title:'Account reset.',type:'info'});
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BOOT — always show auth screen; login/signup controls access
+// ═══════════════════════════════════════════════════════════════
+S.init(); // initialise with default key (no user loaded yet)
+</script>
+</body>
+</html>
